@@ -82,3 +82,31 @@ VNETID=$(az network vnet show -g $RG --name $VNET_NAME --query id -o tsv)
 # Assign SP Permission to VNET
 az role assignment create --assignee $APPID --scope $VNETID --role Contributor
 az role assignment create --assignee $APPID --scope $VNETID --role "Virtual Machine Contributor"
+
+#AKS Creation Azure Monitor for Containers Pre-requisites
+#All that is being done in this section is to setup a Log Analytics Workspace for AKS to help with monitoring, logging and troubleshooting down the road. 
+# Create Log Analytics Workspace
+az group deployment create -n $WORKSPACENAME -g $RG --template-file azuredeploy-loganalytics.json --parameters workspaceName=$WORKSPACENAME --parameters location=$LOC --parameters sku="Standalone"
+
+# Set Workspace ID
+WORKSPACEIDURL=$(az group deployment list -g $RG -o tsv --query '[].properties.outputResources[0].id')
+
+#AKS Cluster Creation
+# Version Info - This is here so you can check out which AKS versions are available in the target region
+az aks get-versions -l $LOC -o table
+
+# Populate the AKS Subnet ID - This is needed so we know which subnet to put AKS into
+SUBNETID=$(az network vnet subnet show -g $RG --vnet-name $VNET_NAME --name $AKSSUBNET_NAME --query id -o tsv)
+
+#To create an AKS cluster
+# Create AKS Cluster with Monitoring add-on using Service Principal from Above
+az aks create -g $RG -n $NAME -k 1.13.5 -l $LOC --node-count 2 --no-ssh-key --enable-addons monitoring --workspace-resource-id $WORKSPACEIDURL --network-plugin azure --service-cidr 10.41.0.0/16 --dns-service-ip 10.41.0.10 --docker-bridge-address 172.17.0.1/16 --vnet-subnet-id $SUBNETID --service-principal $APPID --client-secret $PASSWORD  --no-wait
+
+# Check Provisioning Status of AKS Cluster - ProvisioningState should say 'Succeeded'
+az aks list -o table
+
+# Get AKS Credentials so kubectl works
+az aks get-credentials -g $RG -n $NAME --admin
+
+# Get Nodes
+k get nodes -o wide
