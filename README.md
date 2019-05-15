@@ -16,7 +16,7 @@ AKSSUBNET_NAME="${PREFIX}akssubnet"   # here enter the name of your AKS subnet
 
 SVCSUBNET_NAME="${PREFIX}svcsubnet"   # here enter the name of your service subnet
 
-# DO NOT CHANGE FWSUBNET_NAME - This is currently a requirement for Azure Firewall.
+### DO NOT CHANGE FWSUBNET_NAME - This is currently a requirement for Azure Firewall.
 
 FWSUBNET_NAME="AzureFirewallSubnet"
 
