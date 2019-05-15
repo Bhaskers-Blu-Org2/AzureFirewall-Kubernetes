@@ -17,6 +17,7 @@ FWROUTE_TABLE_NAME="${PREFIX}fwrt"
 FWROUTE_NAME="${PREFIX}fwrn"
 STORAGE="${PREFIX}blob"
 
+az login
 
 # Get ARM Access Token and Subscription ID - This will be used for AuthN later.
 ACCESS_TOKEN=$(az account get-access-token -o tsv --query 'accessToken')
@@ -29,3 +30,39 @@ az group create --name $RG --location $LOC
 az network vnet create --resource-group $RG --name $VNET_NAME --address-prefixes 10.42.0.0/16 --subnet-name $AKSSUBNET_NAME --subnet-prefix 10.42.1.0/24 
 az network vnet subnet create --resource-group $RG --vnet-name $VNET_NAME --name $SVCSUBNET_NAME --address-prefix 10.42.2.0/24
 az network vnet subnet create --resource-group $RG --vnet-name $VNET_NAME --name $FWSUBNET_NAME --address-prefix 10.42.4.0/24
+
+
+#This section walks through setting up Azure Firewall inbound and outbound rules. The main purpose of the firewall here is to help organizations to setup ingress and egress
+# traffic rules so the AKS Cluster is not just open to the world and cannot reach out to everythign on the Internet at the same time.
+
+#Create Azure FireWall via CLI or Portal
+# Create Public IP for Azure Firewall
+az network public-ip create -g $RG -n $FWPUBLICIP_NAME -l $LOC --sku "Standard"
+# Create Azure Firewall
+az network firewall create -g $RG -n $FWNAME -l $LOC
+# Configure Azure Firewall IP Config - This command will take several mins so be patient.
+az network firewall ip-config create -g $RG -f $FWNAME -n $FWIPCONFIG_NAME --public-ip-address $FWPUBLICIP_NAME --vnet-name $VNET_NAME
+# Capture Azure Firewall IP Address for Later Use
+FWPUBLIC_IP=$(az network public-ip show -g $RG -n $FWPUBLICIP_NAME --query "ipAddress" -o tsv)
+FWPRIVATE_IP=$(az network firewall show -g $RG -n $FWNAME --query "ipConfigurations[0].privateIpAddress" -o tsv)
+# Validate Azure Firewall IP Address Values - This is more for awareness so you can help connect the networking dots
+echo $FWPUBLIC_IP
+echo $FWPRIVATE_IP         
+
+# Create UDR & Routing Table for Azure Firewall
+az network route-table create -g $RG --name $FWROUTE_TABLE_NAME
+az network route-table route create -g $RG --name $FWROUTE_NAME --route-table-name $FWROUTE_TABLE_NAME --address-prefix 0.0.0.0/0 --next-hop-type VirtualAppliance --next-hop-ip-address $FWPRIVATE_IP --subscription $SUBID
+
+# Add the Azure Firewall extension to Azure CLI in case you do not already have it.
+az extension add --name azure-firewall
+
+# Create the Outbound Network Rule from Worker Nodes to Control Plane
+az network firewall network-rule create -g $RG -f $FWNAME --collection-name 'aksfwnr' --name "allow network"  --protocols 'TCP' --source-addresses '*' --destination-addresses '*' --destination-ports 22 443 --action allow --priority 100
+az network firewall network-rule create -g $RG -f $FWNAME --collection-name 'aksfwnr2' -n 'fileshare' --protocols 'TCP' --source-addresses '*' --destination-addresses '*' --destination-ports 445 --action allow --priority 200
+
+# Add Application FW Rules for Egress Traffic
+az network firewall application-rule create  --firewall-name $FWNAME --collection-name "aksbasics" --name "allow network" --protocols http=80 https=443 --source-addresses "*" --resource-group $RG --action "Allow" --target-fqdns "*eastus.azmk8s.io" "*auth.docker.io" "*cloudflare.docker.io" "*registry-1.docker.io" "k8s.gcr.io" "storage.googleapis.com" "*cloudflare.docker.com"  --priority 100
+az network firewall application-rule create  --firewall-name $FWNAME --collection-name "aksextended" --name "allow network" --protocols http=80 https=443 --source-addresses "*" --resource-group $RG --action "Allow" --target-fqdns "login.microsoftonline.com"  "*.management.azure.com" "mcr.microsoft.com" "download.opensuse.org" "*.azureedge.net" "*.ubuntu.com" "*azurecr.io" "*blob.core.windows.net"  --priority 101
+
+# Associate AKS Subnet to Azure Firewall
+az network vnet subnet update -g $RG --vnet-name $VNET_NAME --name $AKSSUBNET_NAME --route-table $FWROUTE_TABLE_NAME
