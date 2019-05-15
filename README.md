@@ -1,4 +1,8 @@
 
+ter the name of your ingress subnet
+KUBE_AGENT_SUBNET_NAME="aks-subnet" # here enter the name of your AKS subnet
+FW_NAME="evill-azfw" # here enter the name of your azure firewall resource
+FW_IP_NAME="azfw-ip" # here enter the name of your public ip resour
 
 PREFIX="wr"
 
