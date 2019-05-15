@@ -1,32 +1,56 @@
 
 
 PREFIX="wr"
+
 RG="${PREFIX}-rg"  # here enter the resources group name of your AKS cluster
+
 LOC="eastus"   # here enter the datacenter location
+
 NAME="${PREFIX}20190212"  # here enter the name of your kubernetes resource
+
 ACR_NAME="${NAME}acr"   # here enter the name of your Azure Container Registrar
+
 VNET_NAME="${PREFIX}vnet"  # here enter the name of your vnet
+
 AKSSUBNET_NAME="${PREFIX}akssubnet"   # here enter the name of your AKS subnet
+
 SVCSUBNET_NAME="${PREFIX}svcsubnet"   # here enter the name of your service subnet
+
 # DO NOT CHANGE FWSUBNET_NAME - This is currently a requirement for Azure Firewall.
+
 FWSUBNET_NAME="AzureFirewallSubnet"
+
 APPGWSUBNET_NAME="${PREFIX}appgwsubnet"
+
 WORKSPACENAME="${PREFIX}k8slogs"
+
 IDENTITY_NAME="${PREFIX}identity"
+
 FWNAME="${PREFIX}fw"
+
 FWPUBLICIP_NAME="${PREFIX}fwpublicip"
+
 FWIPCONFIG_NAME="${PREFIX}fwconfig"
+
 FWROUTE_TABLE_NAME="${PREFIX}fwrt"
+
 FWROUTE_NAME="${PREFIX}fwrn"
 AGNAME="${PREFIX}ag"
+
 AGPUBLICIP_NAME="${PREFIX}agpublicip"
+
 STORAGE="${PREFIX}blob"
 
 # Get ARM Access Token and Subscription ID - This will be used for AuthN later.
+
 ACCESS_TOKEN=$(az account get-access-token -o tsv --query 'accessToken')
+
 # NOTE: Update Subscription Name
-SUBID=$(az account show -s '<SUBSCRIPTION_NAME_GOES_HERE>' -o tsv --query 'id')  
+
+SUBID=$(az account show -s '<SUBSCRIPTION_NAME_GOES_HERE>' -o tsv --query 'id') 
+
 # Create Resource Group
+
 az group create --name $RG --location $LOC
 
 
